@@ -12,41 +12,11 @@ on:
       - v*
 
 jobs:
-  build-operator:
-    runs-on: ubuntu-latest
-    env:
-      IMG: ghcr.io/drschlaubi/operator:${{ github.sha }}
-
-    steps:
-      - uses: actions/checkout@v3
-        with:
-          submodules: true
-
-      - name: Docker Build
-        run: |
-          make docker-build
-
-      - uses: helm/kind-action@v1.7.0
-        with:
-          cluster_name: kind
-          config: ./hack/kind-config.yaml
-      - name: Run tests
-        timeout-minutes: 12
-        run: |
-          make docker-kind-load
-          make deploy
-          make test
-
-      - name: Cleanup
-        run: |
-          make undeploy
-
   release-operator:
     permissions:
       contents: write
       packages: write
     runs-on: ubuntu-latest
-    needs: build-operator
     env:
       IMG: ghcr.io/drschlaubi/operator:${{ github.ref_name }}
       VERSION: ${{ github.ref_name }}
@@ -75,15 +45,6 @@ jobs:
 
       - name: Install helm
         uses: azure/setup-helm@v4
-
-      - name: Push Helm chart as OCI to Github
-        run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | \
-          helm registry login -u ${{ github.actor }} --password-stdin ghcr.io
-          
-          helm package charts/dragonfly-operator
-          
-          helm push dragonfly-operator-${{ env.VERSION }}.tgz oci://ghcr.io/drschlaubi/dragonfly-operator/helm
 
       - name: Build and Publish image into GHCR
         uses: docker/build-push-action@v5
